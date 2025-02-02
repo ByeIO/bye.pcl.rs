@@ -2,5 +2,52 @@
 name = "bye_pcl_rs"
 version = "0.1.0"
 edition = "2021"
+# 可免费商用
+license-file = "./LICENSE"
+keywords = [
+    "pointcloud",
+    "kdtree",
+    "octree",
+    "machine-learning",
+    "filter",
+    "segmentation",
+    "tracking",
+]
+description = "The Point Cloud Library (PCL) is a standalone, large scale, open project for 2D/3D image and point cloud processing.Implemented in pure Rust."
+authors = ["qsbye"]
+homepage = "https://docs.rs/bye_pcl_rs"
+documentation = "https://docs.rs/bye_pcl_rs"
+repository = "https://github.com/ByeIO/bye.pcl.rs"
+readme = "README.md"
+exclude = ["git", "assets/pcl"]
 
 [dependencies]
+# 线性代数
+nalgebra = "0.33.2"
+# 异常处理
+anyhow = "1.0.95"
+# 二进制编码
+base64 = "0.22.1"
+# 数学特性
+num-traits = "0.2.19"
+# 随机数
+rand = { version = "0.9.0" }
+rand_distr = "0.5.0"
+# 序列化
+serde = { version = "1.0.217", features = ["derive"] }
+# 多线程
+tokio = "1.43.0"
+# 命令行参数解析
+cpal = "0.15.3"
+# kdtree数据结构
+kd-tree = { version = "0.6.0", features = [
+    "serde",
+    "nalgebra",
+    "nalgebra-serde",
+] }
+# 机器学习,数据分析最佳实践算法整合包
+rstats = "2.1.12"
+# 性能评测
+criterion = "0.5.1"
+# fft快速傅立叶变换算法
+realfft = "3.4.0"
