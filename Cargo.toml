@@ -51,3 +51,16 @@ rstats = "2.1.12"
 criterion = "0.5.1"
 # fft快速傅立叶变换算法
 realfft = "3.4.0"
+# 宏编程/元编程
+proc-macro2 = "1.0.93"
+paste = "1.0.15"
+syn = { version = "2.0.98", features = ["full"] }
+quote = { version = "1.0.38", features = [] }
+# 浮点数精度处理
+approx = "0.5.1"
+# 复数支持
+num-complex = "0.4.6"
+
+[lib]
+# 支持派生宏, 过程宏, 属性宏
+proc-macro = false

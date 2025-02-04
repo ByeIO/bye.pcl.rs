@@ -11,6 +11,10 @@
 #![allow(unused_must_use)]
 #![allow(non_snake_case)]
 #![allow(unused_doc_comments)]
+#![feature(const_trait_impl)]
+// #![feature(effects)]
+// unsafe
+// #![allow(incomplete_features)]
 
 // 1. 2d模块
 pub mod _2d;

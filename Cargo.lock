@@ -143,17 +143,23 @@ name = "bye_pcl_rs"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "approx",
  "base64",
  "cpal",
  "criterion",
  "kd-tree",
  "nalgebra 0.33.2",
+ "num-complex",
  "num-traits",
+ "paste",
+ "proc-macro2",
+ "quote",
  "rand",
  "rand_distr",
  "realfft",
  "rstats",
  "serde",
+ "syn",
  "tokio",
 ]
 
