@@ -1,6 +1,6 @@
 //! 将point_types.h, point_types.hpp, point_types.cpp拆分为多个文件
 
-// 1. 点云结构体定义, 向上一级代码导出
+// 1. 点结构体定义, 向上一级代码导出
 pub mod defines;
 pub use defines::{
     Axis,
@@ -56,17 +56,17 @@ pub use defines::{
     ShapeContext1980,
     UniqueShapeContext1960,
     VFHSignature308,
-    PCL_DESCRIPTOR_FEATURE_POINT_TYPES,
-    PCL_FEATURE_POINT_TYPES,
-    PCL_NORMAL_POINT_TYPES,
-    // 枚举
-    PCL_XYZL_POINT_TYPES,
     RGB,
     SHOT1344,
     SHOT352,
+    // 枚举
+    PCL_DESCRIPTOR_FEATURE_POINT_TYPES,
+    PCL_FEATURE_POINT_TYPES,
+    PCL_NORMAL_POINT_TYPES,
+    PCL_XYZL_POINT_TYPES,
 };
 
-// 2. 点云结构体描述符大小, 向上一级代码导出
+// 2. 点结构体描述符大小, 向上一级代码导出
 pub mod descriptor_size;
 pub use descriptor_size::descriptor_size_v;
 
@@ -79,26 +79,26 @@ pub use eigen_map::{
     Vector4cMapConst, Vector4fMap, Vector4fMapConst,
 };
 
-// 4. 实现点云构造函数(移除了与内存对齐相关的逻辑)
+// 4. 实现点构造函数(移除了与内存对齐相关的逻辑)
 pub mod impls;
-pub use impls::*;
+// pub use impls::*;
 
-// 5. 实现点云属性存在与否的判断
+// 5. 实现点属性存在与否的判断
 pub mod has_sth;
 pub use has_sth::*;
 
-// #[cfg(test)]
-// mod tests1 {
-//     use super::*;
+#[cfg(test)]
+mod tests1 {
+    use super::*;
 
-//     //  测试PointXYZ的has_xyz()
-//     #[test]
-//     fn test_point_xyz() {
-//         let p1 = PointXYZ::new();
-//         assert_eq!(p1.x, 0.0);
-//         assert_eq!(p1.y, 0.0);
-//         assert_eq!(p1.z, 0.0);
+    //  测试PointXYZ的has_xyz()
+    #[test]
+    fn test_point_xyz() {
+        let p1 = PointXYZ::new();
+        assert_eq!(p1.x, 0.0);
+        assert_eq!(p1.y, 0.0);
+        assert_eq!(p1.z, 0.0);
 
-//         // assert!(p1.has_xyz());
-//     }
-// }
+        // assert!(p1.has_xyz());
+    }
+}

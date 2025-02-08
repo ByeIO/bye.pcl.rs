@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>PCL.js Example</title>
+  <script type="module">
+    import * as PCL from './pcljs/pcl.js';
+
+    async function processPointCloud() {
+      try {
+        await PCL.init();
+        const cloud = PCL.loadPCDFile('./office1.pcd', PCL.PointXYZRGB);
+        PCL.savePCDFileASCII('./office1_ascii.pcd', cloud);
+        console.log('Point cloud processing complete!');
+      } catch (error) {
+        console.error('Error processing point cloud:', error);
+      }
+    }
+
+    // Run the processing when the page loads
+    window.addEventListener('load', processPointCloud);
+  </script>
+</head>
+<body>
+  <h1>Point Cloud Processing</h1>
+  <p>Check the console for output.</p>
+</body>
+</html>

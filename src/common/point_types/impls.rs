@@ -2,15 +2,16 @@
 #![allow(unused_unsafe)]
 #![allow(non_camel_case_types)]
 
-//! 实现点云构造函数,
+//! 实现点构造函数,
 //! 为了安全性, 移除了内存对齐相关逻辑
 
 extern crate quote;
 extern crate syn;
 
-#[path = "./defines.rs"]
-mod defines;
-use defines::{
+/// 不能使用path方式引入,否则会找不到impl实现
+// #[path = "./defines.rs"]
+// mod defines;
+use super::defines::{
     Axis, BRISKSignature512, BorderDescription, BorderTraits, Boundary, CPPFSignature,
     ESFSignature640, FPFHSignature33, GASDSignature512, GASDSignature7992, GASDSignature984,
     GFPFHSignature16, GRSDSignature21, Histogram, Intensity, Intensity32u, Intensity8u,
@@ -24,12 +25,13 @@ use defines::{
     PCL_FEATURE_POINT_TYPES, PCL_NORMAL_POINT_TYPES, PCL_XYZL_POINT_TYPES, RGB, SHOT1344, SHOT352,
 };
 
-#[path = "./descriptor_size.rs"]
-mod descriptor_size;
+// #[path = "./descriptor_size.rs"]
+// mod descriptor_size;
+use super::descriptor_size;
 
-#[path = "./eigen_map.rs"]
-mod eigen_map;
-use eigen_map::PclAddPoint4D;
+// #[path = "./eigen_map.rs"]
+// mod eigen_map;
+use super::eigen_map::PclAddPoint4D;
 
 /* start 点云构造函数 */
 

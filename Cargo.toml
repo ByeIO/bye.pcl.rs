@@ -26,6 +26,7 @@ exclude = ["git", "assets/pcl"]
 nalgebra = "0.33.2"
 # 异常处理
 anyhow = "1.0.95"
+eyre = "0.6.12"
 # 二进制编码
 base64 = "0.22.1"
 # 数学特性
@@ -60,6 +61,10 @@ quote = { version = "1.0.38", features = [] }
 approx = "0.5.1"
 # 复数支持
 num-complex = "0.4.6"
+# 点云pcd文件处理
+pcd-rs = { version = "0.12.0", features = ["derive"] }
+# 点云ply文件处理
+ply-rs-bw = "2.0.1"
 
 [lib]
 # 支持派生宏, 过程宏, 属性宏

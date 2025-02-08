@@ -2,7 +2,7 @@
 #![allow(unused_unsafe)]
 #![allow(non_camel_case_types)]
 
-//! 点云结构体
+//! 点结构体
 
 // 原子数据(空数据)
 use std::marker::PhantomData;
@@ -42,13 +42,15 @@ use rstats;
 use serde::{Deserialize, Serialize};
 // 多线程
 use tokio;
+// PCD文件处理
+use pcd_rs::{PcdDeserialize, PcdSerialize};
 
 // 自定义序列化
 // use crate::common::point_types::my_serde::{MyDeserialize, MySerialize};
 /* start 点云结构体 */
 
 // 1. 成员: float x, y, z
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct PointXYZ {
     pub x: f32,
     pub y: f32,
@@ -63,7 +65,7 @@ impl std::fmt::Display for PointXYZ {
 }
 
 // 2. 成员: rgba
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct RGB {
     pub r: u8,
     pub g: u8,
@@ -78,7 +80,7 @@ impl std::fmt::Display for RGB {
 }
 
 // 3. 成员: intensity (float)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct Intensity {
     pub intensity: f32,
 }
@@ -90,7 +92,7 @@ impl std::fmt::Display for Intensity {
 }
 
 // 4. 成员: intensity (u8)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct Intensity8u {
     pub intensity: u8,
 }
@@ -102,7 +104,7 @@ impl std::fmt::Display for Intensity8u {
 }
 
 // 5. 成员: intensity (u32)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct Intensity32u {
     pub intensity: u32,
 }
@@ -114,7 +116,7 @@ impl std::fmt::Display for Intensity32u {
 }
 
 // 6. 成员: float x, y, z, intensity
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct PointXYZI {
     pub x: f32,
     pub y: f32,
@@ -129,7 +131,7 @@ impl std::fmt::Display for PointXYZI {
 }
 
 // 7. 成员: float x, y, z, u32 label
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct PointXYZL {
     pub x: f32,
     pub y: f32,
@@ -144,7 +146,7 @@ impl std::fmt::Display for PointXYZL {
 }
 
 // 8. 成员: u32 label
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct Label {
     pub label: u32,
 }
@@ -156,7 +158,7 @@ impl std::fmt::Display for Label {
 }
 
 // 9. 成员: float x, y, z; u32 rgba
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct PointXYZRGBA {
     pub x: f32,
     pub y: f32,
@@ -181,7 +183,7 @@ impl std::fmt::Display for PointXYZRGBA {
 }
 
 // 10. 成员: float x, y, z, rgb
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct PointXYZRGB {
     pub x: f32,
     pub y: f32,
@@ -205,7 +207,7 @@ impl std::fmt::Display for PointXYZRGB {
 }
 
 // 11. 成员: float x, y, z, rgb, u32 label
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct PointXYZRGBL {
     pub x: f32,
     pub y: f32,
@@ -231,7 +233,7 @@ impl std::fmt::Display for PointXYZRGBL {
 }
 
 // 12. 成员: float x, y, z, L, a, b
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct PointXYZLAB {
     pub x: f32,
     pub y: f32,
@@ -252,7 +254,7 @@ impl std::fmt::Display for PointXYZLAB {
 }
 
 // 13. 成员: float x, y, z, h, s, v
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct PointXYZHSV {
     pub x: f32,
     pub y: f32,
@@ -273,7 +275,7 @@ impl std::fmt::Display for PointXYZHSV {
 }
 
 // 14. 成员: float x, y
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct PointXY {
     pub x: f32,
     pub y: f32,
@@ -286,7 +288,7 @@ impl std::fmt::Display for PointXY {
 }
 
 // 15. 成员: float u, v
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct PointUV {
     pub u: f32,
     pub v: f32,
@@ -299,7 +301,7 @@ impl std::fmt::Display for PointUV {
 }
 
 // 16. 成员: float x, y, z, strength
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct InterestPoint {
     pub x: f32,
     pub y: f32,
@@ -314,7 +316,7 @@ impl std::fmt::Display for InterestPoint {
 }
 
 // 17. 成员: float normal[3], curvature
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct Normal {
     pub normal: [f32; 3],
     pub curvature: f32,
@@ -331,7 +333,7 @@ impl std::fmt::Display for Normal {
 }
 
 // 18. 成员: float normal[3]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, PcdDeserialize, PcdSerialize)]
 pub struct Axis {
     pub normal: [f32; 3],
 }
@@ -347,7 +349,7 @@ impl std::fmt::Display for Axis {
 }
 
 // 19. 成员: float x, y, z; float normal[3], curvature
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct PointNormal {
     pub x: f32,
     pub y: f32,
@@ -367,7 +369,7 @@ impl std::fmt::Display for PointNormal {
 }
 
 // 20. 成员: float x, y, z, rgb, normal[3], curvature
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct PointXYZRGBNormal {
     pub x: f32,
     pub y: f32,
@@ -397,7 +399,7 @@ impl std::fmt::Display for PointXYZRGBNormal {
 }
 
 // 21. 成员: float x, y, z, intensity, normal[3], curvature
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct PointXYZINormal {
     pub x: f32,
     pub y: f32,
@@ -425,7 +427,7 @@ impl std::fmt::Display for PointXYZINormal {
 }
 
 // 22. 成员: float x, y, z, label, normal[3], curvature
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct PointXYZLNormal {
     pub x: f32,
     pub y: f32,
@@ -453,7 +455,7 @@ impl std::fmt::Display for PointXYZLNormal {
 }
 
 // 23. 成员: float x, y, z (union with float point[4]), range
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct PointWithRange {
     pub point: [f32; 4],
     pub range: f32,
@@ -470,7 +472,7 @@ impl std::fmt::Display for PointWithRange {
 }
 
 // 24. 成员: float x, y, z, vp_x, vp_y, vp_z
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct PointWithViewpoint {
     pub x: f32,
     pub y: f32,
@@ -491,7 +493,7 @@ impl std::fmt::Display for PointWithViewpoint {
 }
 
 // 25. 成员: float j1, j2, j3
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct MomentInvariants {
     pub j1: f32,
     pub j2: f32,
@@ -505,7 +507,7 @@ impl std::fmt::Display for MomentInvariants {
 }
 
 // 26. 成员: float r_min, r_max
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct PrincipalRadiiRSD {
     pub r_min: f32,
     pub r_max: f32,
@@ -518,7 +520,7 @@ impl std::fmt::Display for PrincipalRadiiRSD {
 }
 
 // 27. 成员: u8 boundary_point
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct Boundary {
     pub boundary_point: u8,
 }
@@ -530,7 +532,7 @@ impl std::fmt::Display for Boundary {
 }
 
 // 28. 成员: float principal_curvature[3], pc1, pc2
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct PrincipalCurvatures {
     pub principal_curvature: [f32; 3],
     pub pc1: f32,
@@ -553,7 +555,7 @@ impl std::fmt::Display for PrincipalCurvatures {
 
 // 29. 成员: float descriptor[352], rf[9]
 // Serialize无法支持352数组序列化
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PcdDeserialize, PcdSerialize)]
 pub struct SHOT352 {
     pub descriptor: [f32; 352],
     pub rf: [f32; 9],
@@ -584,7 +586,7 @@ impl std::fmt::Display for SHOT352 {
 
 // 30. 成员: float descriptor[1344], rf[9]
 // Serialize无法支持1344数组序列化
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PcdDeserialize, PcdSerialize)]
 pub struct SHOT1344 {
     pub descriptor: [f32; 1344],
     pub rf: [f32; 9],
@@ -642,7 +644,7 @@ impl std::fmt::Display for ReferenceFrame {
 
 // 32. 成员: float descriptor[1980], rf[9]
 // Serialize无法支持大数组序列化
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PcdDeserialize, PcdSerialize)]
 pub struct ShapeContext1980 {
     pub descriptor: [f32; 1980],
     pub rf: [f32; 9],
@@ -673,7 +675,7 @@ impl std::fmt::Display for ShapeContext1980 {
 
 // 33. 成员: float descriptor[1960], rf[9]
 // Serialize无法支持大数组序列化
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PcdDeserialize, PcdSerialize)]
 pub struct UniqueShapeContext1960 {
     pub descriptor: [f32; 1960],
     pub rf: [f32; 9],
@@ -704,7 +706,7 @@ impl std::fmt::Display for UniqueShapeContext1960 {
 
 // 34. 成员: float pfh[125]
 // Serialize无法支持大数组序列化
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PcdDeserialize, PcdSerialize)]
 pub struct PFHSignature125 {
     pub pfh: [f32; 125],
 }
@@ -727,7 +729,7 @@ impl std::fmt::Display for PFHSignature125 {
 
 // 35. 成员: float pfhrgb[250]
 // Serialize无法支持大数组序列化
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PcdDeserialize, PcdSerialize)]
 pub struct PFHRGBSignature250 {
     pub pfhrgb: [f32; 250],
 }
@@ -749,7 +751,7 @@ impl std::fmt::Display for PFHRGBSignature250 {
 }
 
 // 36. 成员: float f1, f2, f3, f4, alpha_m
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct PPFSignature {
     pub f1: f32,
     pub f2: f32,
@@ -769,7 +771,7 @@ impl std::fmt::Display for PPFSignature {
 }
 
 // 37. 成员: float f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, alpha_m
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct CPPFSignature {
     pub f1: f32,
     pub f2: f32,
@@ -805,7 +807,7 @@ impl std::fmt::Display for CPPFSignature {
 }
 
 // 38. 成员: float f1, f2, f3, f4, r_ratio, g_ratio, b_ratio, alpha_m
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct PPFRGBSignature {
     pub f1: f32,
     pub f2: f32,
@@ -835,7 +837,7 @@ impl std::fmt::Display for PPFRGBSignature {
 }
 
 // 39. 成员: float values[12]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 #[serde(transparent)]
 pub struct NormalBasedSignature12 {
     pub values: [f32; 12],
@@ -858,7 +860,7 @@ impl std::fmt::Display for NormalBasedSignature12 {
 }
 
 // 40. 成员: float fpfh[33]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PcdDeserialize, PcdSerialize)]
 pub struct FPFHSignature33 {
     pub fpfh: [f32; 33],
 }
@@ -880,7 +882,7 @@ impl std::fmt::Display for FPFHSignature33 {
 }
 
 // 41. 成员: float vfh[308]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PcdDeserialize, PcdSerialize)]
 pub struct VFHSignature308 {
     pub vfh: [f32; 308],
 }
@@ -902,7 +904,7 @@ impl std::fmt::Display for VFHSignature308 {
 }
 
 // 42. 成员: float grsd[21]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PcdDeserialize, PcdSerialize)]
 pub struct GRSDSignature21 {
     pub grsd: [f32; 21],
 }
@@ -924,7 +926,7 @@ impl std::fmt::Display for GRSDSignature21 {
 }
 
 // 43. 成员: float esf[640]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PcdDeserialize, PcdSerialize)]
 pub struct ESFSignature640 {
     pub esf: [f32; 640],
 }
@@ -946,7 +948,7 @@ impl std::fmt::Display for ESFSignature640 {
 }
 
 // 44. 成员: float gasd[512]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PcdDeserialize, PcdSerialize)]
 pub struct GASDSignature512 {
     pub gasd: [f32; 512],
 }
@@ -968,7 +970,7 @@ impl std::fmt::Display for GASDSignature512 {
 }
 
 // 45. 成员: float gasd[984]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PcdDeserialize, PcdSerialize)]
 pub struct GASDSignature984 {
     pub gasd: [f32; 984],
 }
@@ -990,7 +992,7 @@ impl std::fmt::Display for GASDSignature984 {
 }
 
 // 46. 成员: float gasd[7992]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PcdDeserialize, PcdSerialize)]
 pub struct GASDSignature7992 {
     pub gasd: [f32; 7992],
 }
@@ -1012,7 +1014,7 @@ impl std::fmt::Display for GASDSignature7992 {
 }
 
 // 47. 成员: float histogram[16]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct GFPFHSignature16 {
     pub gfpfh: [f32; 16],
 }
@@ -1034,7 +1036,7 @@ impl std::fmt::Display for GFPFHSignature16 {
 }
 
 // 48. 成员: float scale; float orientation; u8 descriptor[64]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PcdDeserialize, PcdSerialize)]
 pub struct BRISKSignature512 {
     pub scale: f32,
     pub orientation: f32,
@@ -1059,7 +1061,7 @@ impl std::fmt::Display for BRISKSignature512 {
 }
 
 // 49. 成员: float x, y, z, roll, pitch, yaw; float descriptor[36]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PcdDeserialize, PcdSerialize)]
 pub struct Narf36 {
     pub x: f32,
     pub y: f32,
@@ -1114,7 +1116,7 @@ impl std::fmt::Display for BorderDescription {
 }
 
 // 51. 成员: float gradient[3]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct IntensityGradient {
     pub gradient: [f32; 3],
 }
@@ -1152,7 +1154,7 @@ impl<const N: usize> std::fmt::Display for Histogram<N> {
 }
 
 // 53. 成员: float x, y, z, scale, angle, response, octave
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct PointWithScale {
     pub x: f32,
     pub y: f32,
@@ -1174,7 +1176,7 @@ impl std::fmt::Display for PointWithScale {
 }
 
 // 54. 成员: float x, y, z, normal[3], rgba, radius, confidence, curvature
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct PointSurfel {
     pub x: f32,
     pub y: f32,
@@ -1209,7 +1211,7 @@ impl std::fmt::Display for PointSurfel {
 }
 
 // 55. 成员: float x, y, z, intensity, intensity_variance, height_variance
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
 pub struct PointDEM {
     pub x: f32,
     pub y: f32,
