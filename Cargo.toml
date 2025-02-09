@@ -1,13 +1,11 @@
 [package]
 name = "bye_pcl_rs"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 # 可免费商用
 license-file = "./LICENSE"
 keywords = [
     "pointcloud",
-    "kdtree",
-    "octree",
     "machine-learning",
     "filter",
     "segmentation",
@@ -19,7 +17,7 @@ homepage = "https://docs.rs/bye_pcl_rs"
 documentation = "https://docs.rs/bye_pcl_rs"
 repository = "https://github.com/ByeIO/bye.pcl.rs"
 readme = "README.md"
-exclude = ["git", "assets/pcl"]
+exclude = ["git", "assets"]
 
 [dependencies]
 # 线性代数
@@ -62,9 +60,11 @@ approx = "0.5.1"
 # 复数支持
 num-complex = "0.4.6"
 # 点云pcd文件处理
-pcd-rs = { version = "0.12.0", features = ["derive"] }
+bye_pcd_rs = { version = "0.12.1" }
 # 点云ply文件处理
 ply-rs-bw = "2.0.1"
+# 计数工具
+typenum = "1.17.0"
 
 [lib]
 # 支持派生宏, 过程宏, 属性宏

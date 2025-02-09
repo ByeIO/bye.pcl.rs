@@ -15,7 +15,7 @@ use std::fmt;
 // 宏编程
 use paste::paste;
 // 点云PCD文件处理
-use pcd_rs::{PcdDeserialize, Reader};
+use bye_pcd_rs::{PcdDeserialize, Reader};
 use eyre::Result;
 // 点云PLY文件处理
 extern crate ply_rs_bw;
@@ -46,7 +46,7 @@ pub struct PcdMeta {
     pub viewpoint: ViewPoint,
     pub num_points: u64,
     pub data: PcdDataKind,
-    pub field_defs: pcd_rs::Schema,
+    pub field_defs: bye_pcd_rs::Schema,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -101,7 +101,7 @@ macro_rules! impl_point_cloud_pcd {
                         println!("PCD文件: {}\n", absolute_path.display());
                              
                         // binary_compressed的格式
-                        let reader = pcd_rs::Reader::open(path)
+                        let reader = bye_pcd_rs::Reader::open(path)
                             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
                         let collected_points: eyre::Result<Vec<$type>, _> = reader.collect();
                         // 从点云容器构造点云并返回
