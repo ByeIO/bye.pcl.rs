@@ -154,7 +154,7 @@ pub struct Leaf {
 /* start 枚举 */
 
 // 1. 投影方法
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum ProjectionMethod{
     // 投影到MLS平面。
     NONE,      
@@ -165,7 +165,7 @@ pub enum ProjectionMethod{
 }
 
 // 2. 上采样方法
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum UpsamplingMethod{
     // 不进行上采样，仅将输入点投影到它们自己的MLS表面。
     NONE,                   
@@ -1470,5 +1470,353 @@ mod tests1 {
 
         // 验证计算得到的 MLS 权重是否正确
         assert_eq!(weight, std::f64::consts::E.powf(-sq_dist / sq_mls_radius));
+    }
+}
+
+#[cfg(test)]
+mod tests2 {
+    use super::*;
+    use nalgebra::Vector3;
+    use rand::{SeedableRng,rng};
+
+    // 测试 MovingLeastSquares 的构造函数
+    #[test]
+    fn test_moving_least_squares_new() {
+        let mls = MovingLeastSquares::<PointXYZRGBNormal, PointXYZRGBNormal>::new();
+
+        // 验证构造函数初始化的字段是否符合默认值
+        assert!(mls.input.is_empty());
+        assert!(mls.output.is_empty());
+        assert_eq!(mls.search_radius, 0.0);
+        assert_eq!(mls.order, 2);
+        assert!(!mls.compute_normals);
+        assert!(mls.mls_results.is_empty());
+        assert!(mls.distinct_cloud.is_empty());
+        assert_eq!(mls.upsample_method, UpsamplingMethod::NONE);
+        assert_eq!(mls.upsampling_radius, 0.0);
+        assert_eq!(mls.upsampling_step, 0.0);
+        assert_eq!(mls.desired_num_points_in_radius, 0);
+        assert!(mls.cache_mls_results);
+        assert_eq!(mls.projection_method, ProjectionMethod::SIMPLE);
+        assert_eq!(mls.threads, 1);
+        assert_eq!(mls.voxel_size, 1.0);
+        assert_eq!(mls.dilation_iteration_num, 0);
+        assert!(mls.corresponding_input_indices.is_empty());
+        assert!(mls.rng_uniform_distribution.is_none());
+    }
+
+    // 测试 set_input_cloud 方法
+    #[test]
+    fn test_set_input_cloud() {
+        let mut mls = MovingLeastSquares::<PointXYZRGBNormal, PointXYZRGBNormal>::new();
+        let cloud = Arc::new(vec![PointXYZRGBNormal::default()]);
+        mls.set_input_cloud(cloud.clone());
+
+        // 验证设置输入点云后，input 字段是否正确更新
+        assert_eq!(mls.input, cloud);
+    }
+
+    // 测试 set_search_radius 方法
+    #[test]
+    fn test_set_search_radius() {
+        let mut mls = MovingLeastSquares::<PointXYZRGBNormal, PointXYZRGBNormal>::new();
+        let radius = 1.0;
+        mls.set_search_radius(radius);
+
+        // 验证设置搜索半径后，search_radius 字段是否正确更新
+        assert_eq!(mls.search_radius, radius);
+    }
+
+    // 测试 set_polynomial_order 方法
+    #[test]
+    fn test_set_polynomial_order() {
+        let mut mls = MovingLeastSquares::<PointXYZRGBNormal, PointXYZRGBNormal>::new();
+        let order = 3;
+        mls.set_polynomial_order(order);
+
+        // 验证设置多项式阶数后，order 字段是否正确更新
+        assert_eq!(mls.order, order);
+    }
+
+    // 测试 set_compute_normals 方法
+    #[test]
+    fn test_set_compute_normals() {
+        let mut mls = MovingLeastSquares::<PointXYZRGBNormal, PointXYZRGBNormal>::new();
+        let compute = true;
+        mls.set_compute_normals(compute);
+
+        // 验证设置是否计算法线后，compute_normals 字段是否正确更新
+        assert_eq!(mls.compute_normals, compute);
+    }
+
+    // 测试 set_distinct_cloud 方法
+    #[test]
+    fn test_set_distinct_cloud() {
+        let mut mls = MovingLeastSquares::<PointXYZRGBNormal, PointXYZRGBNormal>::new();
+        let cloud = Arc::new(vec![PointXYZRGBNormal::default()]);
+        mls.set_distinct_cloud(cloud.clone());
+
+        // 验证设置不同点云后，distinct_cloud 字段是否正确更新
+        assert_eq!(mls.distinct_cloud, cloud);
+    }
+
+    // 测试 set_upsampling_method 方法
+    #[test]
+    fn test_set_upsampling_method() {
+        let mut mls = MovingLeastSquares::<PointXYZRGBNormal, PointXYZRGBNormal>::new();
+        let method = UpsamplingMethod::DISTINCT_CLOUD;
+        mls.set_upsampling_method(method);
+
+        // 验证设置上采样方法后，upsample_method 字段是否正确更新
+        assert_eq!(mls.upsample_method, method);
+    }
+
+    // 测试 set_upsampling_radius 方法
+    #[test]
+    fn test_set_upsampling_radius() {
+        let mut mls = MovingLeastSquares::<PointXYZRGBNormal, PointXYZRGBNormal>::new();
+        let radius = 1.0;
+        mls.set_upsampling_radius(radius);
+
+        // 验证设置上采样半径后，upsampling_radius 字段是否正确更新
+        assert_eq!(mls.upsampling_radius, radius);
+    }
+
+    // 测试 set_upsampling_step_size 方法
+    #[test]
+    fn test_set_upsampling_step_size() {
+        let mut mls = MovingLeastSquares::<PointXYZRGBNormal, PointXYZRGBNormal>::new();
+        let step_size = 0.1;
+        mls.set_upsampling_step_size(step_size);
+
+        // 验证设置上采样步长后，upsampling_step 字段是否正确更新
+        assert_eq!(mls.upsampling_step, step_size);
+    }
+
+    // 测试 set_point_density 方法
+    #[test]
+    fn test_set_point_density() {
+        let mut mls = MovingLeastSquares::<PointXYZRGBNormal, PointXYZRGBNormal>::new();
+        let num_points = 10;
+        mls.set_point_density(num_points);
+
+        // 验证设置搜索半径内期望点数后，desired_num_points_in_radius 字段是否正确更新
+        assert_eq!(mls.desired_num_points_in_radius, num_points);
+    }
+
+    // 测试 set_cache_mls_results 方法
+    #[test]
+    fn test_set_cache_mls_results() {
+        let mut mls = MovingLeastSquares::<PointXYZRGBNormal, PointXYZRGBNormal>::new();
+        let cache = false;
+        mls.set_cache_mls_results(cache);
+
+        // 验证设置是否缓存 MLS 结果后，cache_mls_results 字段是否正确更新
+        assert_eq!(mls.cache_mls_results, cache);
+    }
+
+    // 测试 set_projection_method 方法
+    #[test]
+    fn test_set_projection_method() {
+        let mut mls = MovingLeastSquares::<PointXYZRGBNormal, PointXYZRGBNormal>::new();
+        let method = ProjectionMethod::ORTHOGONAL;
+        mls.set_projection_method(method);
+
+        // 验证设置投影方法后，projection_method 字段是否正确更新
+        assert_eq!(mls.projection_method, method);
+    }
+
+    // 测试 set_number_of_threads 方法
+    #[test]
+    fn test_set_number_of_threads() {
+        let mut mls = MovingLeastSquares::<PointXYZRGBNormal, PointXYZRGBNormal>::new();
+        let threads = 4;
+        mls.set_number_of_threads(threads);
+
+        // 验证设置最大线程数后，threads 字段是否正确更新
+        assert_eq!(mls.threads, threads);
+    }
+
+    // 测试 set_dilation_voxel_size 方法
+    #[test]
+    fn test_set_dilation_voxel_size() {
+        let mut mls = MovingLeastSquares::<PointXYZRGBNormal, PointXYZRGBNormal>::new();
+        let size = 0.5;
+        mls.set_dilation_voxel_size(size);
+
+        // 验证设置体素大小后，voxel_size 字段是否正确更新
+        assert_eq!(mls.voxel_size, size);
+    }
+
+    // 测试 set_dilation_iterations 方法
+    #[test]
+    fn test_set_dilation_iterations() {
+        let mut mls = MovingLeastSquares::<PointXYZRGBNormal, PointXYZRGBNormal>::new();
+        let iterations = 2;
+        mls.set_dilation_iterations(iterations);
+
+        // 验证设置体素网格膨胀迭代次数后，dilation_iteration_num 字段是否正确更新
+        assert_eq!(mls.dilation_iteration_num, iterations);
+    }
+
+    // 测试 find_neighbors 方法
+    #[test]
+    fn test_find_neighbors() {
+        let mut mls = MovingLeastSquares::<PointXYZRGBNormal, PointXYZRGBNormal>::new();
+        let cloud = vec![
+            PointXYZRGBNormal { x: 0.0, y: 0.0, z: 0.0, ..Default::default() },
+            PointXYZRGBNormal { x: 1.0, y: 0.0, z: 0.0, ..Default::default() },
+            PointXYZRGBNormal { x: 2.0, y: 0.0, z: 0.0, ..Default::default() },
+        ];
+        mls.input = Arc::new(cloud);
+        let index = 0;
+        let radius = 1.5;
+        let neighbors = mls.find_neighbors(index, radius);
+
+        // 验证查找邻居方法返回的邻居索引是否正确
+        assert!(neighbors.contains(&0));
+        assert!(neighbors.contains(&1));
+        assert!(!neighbors.contains(&2));
+    }
+
+    // 测试 find_neighbors_cloud 方法
+    #[test]
+    fn test_find_neighbors_cloud() {
+        let mut mls = MovingLeastSquares::<PointXYZRGBNormal, PointXYZRGBNormal>::new();
+        let cloud = vec![
+            PointXYZRGBNormal { x: 0.0, y: 0.0, z: 0.0, ..Default::default() },
+            PointXYZRGBNormal { x: 1.0, y: 0.0, z: 0.0, ..Default::default() },
+            PointXYZRGBNormal { x: 2.0, y: 0.0, z: 0.0, ..Default::default() },
+        ];
+        mls.input = Arc::new(cloud);
+        let point = PointXYZRGBNormal { x: 0.5, y: 0.0, z: 0.0, ..Default::default() };
+        let k = 1;
+        let neighbors = mls.find_neighbors_cloud(&point, k);
+
+        // 验证在不同点云中查找邻居方法返回的邻居索引是否正确
+        assert_eq!(neighbors.len(), k);
+        assert!(neighbors.contains(&0));
+    }
+
+    // 测试 process 方法
+    #[test]
+    fn test_process() {
+        let mut mls = MovingLeastSquares::<PointXYZRGBNormal, PointXYZRGBNormal>::new();
+        let cloud = vec![
+            PointXYZRGBNormal { x: 0.0, y: 0.0, z: 0.0, ..Default::default() },
+        ];
+        mls.input = Arc::new(cloud);
+        mls.search_radius = 1.0;
+        mls.rng = rng();
+
+        mls.process();
+
+        // 验证处理方法执行后，输出点云是否有更新
+        assert!(!mls.output.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod tests5 {
+    use super::*;
+    use nalgebra::{Vector3, Vector4};
+
+    // 测试 MLSVoxelGrid 的构造函数
+    #[test]
+    fn test_mlsvoxelgrid_new() {
+        let cloud = Arc::new(vec![
+            PointXYZRGBNormal { x: 0.0, y: 0.0, z: 0.0, ..Default::default() },
+            PointXYZRGBNormal { x: 1.0, y: 1.0, z: 1.0, ..Default::default() },
+        ]);
+        let indices = (0..cloud.len()).collect();
+        let voxel_size = 0.5;
+        let dilation_iteration_num = 1;
+
+        let voxel_grid = MLSVoxelGrid::<PointXYZRGBNormal>::new(&cloud, &indices, voxel_size, dilation_iteration_num);
+
+        // 验证体素网格的基本属性是否正确设置
+        assert!(!voxel_grid.voxel_grid.is_empty());
+        assert_ne!(voxel_grid.bounding_min, Vector4::new(f32::MAX, f32::MAX, f32::MAX, 0.0));
+        assert_ne!(voxel_grid.bounding_max, Vector4::new(f32::MIN, f32::MIN, f32::MIN, 0.0));
+        assert!(voxel_grid.data_size > 0);
+        assert_eq!(voxel_grid.voxel_size, voxel_size);
+    }
+
+    // 测试 get_index_in_1d 方法
+    #[test]
+    fn test_get_index_in_1d() {
+        let index = Vector3::new(1, 2, 3);
+        let data_size = 10;
+        let index_1d = MLSVoxelGrid::<PointXYZRGBNormal>::get_index_in_1d(&index, data_size);
+
+        // 验证三维索引转换为一维索引的计算结果是否正确
+        assert_eq!(index_1d, (1 as u64) * data_size * data_size + (2 as u64) * data_size + (3 as u64));
+    }
+
+    // 测试 get_index_in_3d 方法
+    #[test]
+    fn test_get_index_in_3d() {
+        let index_1d = 123;
+        let data_size = 10;
+        let index_3d = MLSVoxelGrid::<PointXYZRGBNormal>::get_index_in_3d(index_1d, data_size);
+
+        let mut expected_index_3d = Vector3::new(0, 0, 0);
+        expected_index_3d[0] = (index_1d / (data_size * data_size)) as i32;
+        let remaining = index_1d - (expected_index_3d[0] as u64) * data_size * data_size;
+        expected_index_3d[1] = (remaining / data_size) as i32;
+        expected_index_3d[2] = (remaining % data_size) as i32;
+
+        // 验证一维索引转换为三维索引的计算结果是否正确
+        assert_eq!(index_3d, expected_index_3d);
+    }
+
+    // 测试 get_cell_index 方法
+    #[test]
+    fn test_get_cell_index() {
+        let p = Vector3::new(1.2, 2.3, 3.4);
+        let bounding_min = Vector4::new(0.0, 0.0, 0.0, 0.0);
+        let voxel_size = 1.0;
+        let index = MLSVoxelGrid::<PointXYZRGBNormal>::get_cell_index(&p, &bounding_min, voxel_size);
+
+        // 验证获取点所在体素索引的计算结果是否正确
+        assert_eq!(index, Vector3::new(1, 2, 3));
+    }
+
+    // 测试 get_position 方法
+    #[test]
+    fn test_get_position() {
+        let index_1d = 123;
+        let data_size = 10;
+        let bounding_min = Vector4::new(0.0, 0.0, 0.0, 0.0);
+        let voxel_size = 1.0;
+        let position = MLSVoxelGrid::<PointXYZRGBNormal>::get_position(index_1d, data_size, &bounding_min, voxel_size);
+
+        let index_3d = MLSVoxelGrid::<PointXYZRGBNormal>::get_index_in_3d(index_1d, data_size);
+        let mut expected_position = Vector3::new(0.0, 0.0, 0.0);
+        for i in 0..3 {
+            expected_position[i] = (index_3d[i] as f32) * voxel_size + bounding_min[i];
+        }
+
+        // 验证根据一维索引获取点位置的计算结果是否正确
+        assert_eq!(position, expected_position);
+    }
+
+    // 测试 dilate 方法
+    #[test]
+    fn test_dilate() {
+        let cloud = Arc::new(vec![
+            PointXYZRGBNormal { x: 0.0, y: 0.0, z: 0.0, ..Default::default() },
+        ]);
+        let indices = (0..cloud.len()).collect();
+        let voxel_size = 0.5;
+        let dilation_iteration_num = 1;
+
+        let mut voxel_grid = MLSVoxelGrid::<PointXYZRGBNormal>::new(&cloud, &indices, voxel_size, dilation_iteration_num);
+        let original_size = voxel_grid.voxel_grid.len();
+
+        voxel_grid.dilate();
+
+        // 验证膨胀操作后体素网格的大小是否增加
+        assert!(voxel_grid.voxel_grid.len() > original_size);
     }
 }

@@ -367,7 +367,7 @@ impl std::fmt::Display for PointNormal {
 }
 
 // 20. 成员: float x, y, z, rgb, normal[3], curvature
-#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize, Default, Copy)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize, Default, Copy, PartialEq)]
 pub struct PointXYZRGBNormal {
     pub x: f32,
     pub y: f32,
