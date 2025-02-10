@@ -12,6 +12,7 @@
 #![allow(non_snake_case)]
 #![allow(unused_doc_comments)]
 #![feature(const_trait_impl)]
+#![feature(trivial_bounds)]
 // #![feature(effects)]
 // unsafe
 // #![allow(incomplete_features)]
