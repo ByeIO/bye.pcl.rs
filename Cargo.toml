@@ -46,8 +46,6 @@ kd-tree = { version = "0.6.0", features = [
 ] }
 # 机器学习,数据分析最佳实践算法整合包
 rstats = "2.1.12"
-# 性能评测
-criterion = "0.5.1"
 # fft快速傅立叶变换算法
 realfft = "3.4.0"
 # 宏编程/元编程
@@ -65,7 +63,33 @@ bye_pcd_rs = { version = "0.12.1" }
 ply-rs-bw = "2.0.1"
 # 计数工具
 typenum = "1.17.0"
+# 泊松表面重建
+poisson_reconstruction = { version = "0.3.1", features = ["serde", "serde-serialize"] }
+# NURBS曲线/表面建模库
+curvo = { version = "0.1.49", features = ["serde"] }
+
+[dev-dependencies]
+# 性能评测
+criterion = { version = "0.5.1", features = ["html_reports", "plotters", "cargo_bench_support"],default-features = false }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+# 性能评测
+criterion = { version = "0.5.1", features = ["rayon"] }
+
+# [target.'cfg(not(target_arch = "wasm32"))'.patch.crates-io]
+# # 依赖覆盖, 正常目标使用正常的库
+# getrandom = { version = "0.3.1", path="./static/getrandom"}
+
+# [target.'cfg(target_arch = "wasm32")'.patch.crates-io]
+# # 依赖覆盖, 魔改版
+# getrandom = { version = "0.3.1", path="./static/getrandom_wyhash" }
+
+[patch.crates-io]
+# 依赖覆盖, 魔改版
+getrandom = { version = "0.3.1", path="./static/getrandom_wyhash" }
 
 [lib]
 # 支持派生宏, 过程宏, 属性宏
 proc-macro = false
+# crate类型必须为cdylib以编译到wasm32-unknown-unknown
+crate-type = ["cdylib", "rlib"]

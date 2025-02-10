@@ -1,0 +1,28 @@
+{
+  "name": "bye_pcl_rs",
+  "collaborators": [
+    "qsbye"
+  ],
+  "description": "The Point Cloud Library (PCL) is a standalone, large scale, open project for 2D/3D image and point cloud processing.Implemented in pure Rust.",
+  "version": "0.1.1",
+  "license": "SEE LICENSE IN ./LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ByeIO/bye.pcl.rs"
+  },
+  "files": [
+    "bye_pcl_rs_bg.wasm",
+    "bye_pcl_rs.js",
+    "bye_pcl_rs.d.ts"
+  ],
+  "browser": "bye_pcl_rs.js",
+  "homepage": "https://docs.rs/bye_pcl_rs",
+  "types": "bye_pcl_rs.d.ts",
+  "keywords": [
+    "pointcloud",
+    "machine-learning",
+    "filter",
+    "segmentation",
+    "tracking"
+  ]
+}
