@@ -6,20 +6,36 @@
 //! 最小二乘搜索法
 
 // 标准库
-use std::collections::HashMap;
+use std::collections::{ HashMap, BTreeMap };
 use std::sync::Arc;
+use std::marker::PhantomData;
+use std::cell::RefCell;
+use std::borrow::{BorrowMut, Borrow};
+
+// 随机数
+use rand::Rng;
+use rand_distr::Uniform;
+
+// 元编程
+use paste::paste;
 
 // 线性代数
 use nalgebra::{
     Vector2, Vector3, Vector4, 
     Matrix2, Matrix3, Matrix, Vector, Const,
     DVector, DMatrix, DefaultAllocator,
-    allocator::Allocator, 
+    allocator::Allocator, DimName, Dim, 
+    storage::Storage, U3, 
+};
+
+// 内部库
+use crate::common::{
+    PointXYZRGB, PointXYZRGBNormal, Normal,
 };
 
 /* start 结构体 */
 // 1. 定义 MLSResult 结构体，用于存储 MLS 拟合的结果
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct MLSResult {
     // 查询点
     pub query_point: Vector3<f64>, 
@@ -57,6 +73,32 @@ pub struct MovingLeastSquares<PointInT, PointOutT> {
     pub compute_normals: bool,
     // 存储 MLS 结果
     pub mls_results: Vec<MLSResult>,
+    // 不同的点云，用于DISTINCT_CLOUD上采样方法
+    pub distinct_cloud: Arc<Vec<PointInT>>,
+    // 上采样方法
+    pub upsample_method: UpsamplingMethod,
+    // 上采样半径，仅用于SAMPLE_LOCAL_PLANE上采样
+    pub upsampling_radius: f64,
+    // 上采样步长，仅用于SAMPLE_LOCAL_PLANE上采样
+    pub upsampling_step: f64,
+    // 搜索半径内期望的点数，仅用于RANDOM_UNIFORM_DENSITY上采样
+    pub desired_num_points_in_radius: usize,
+    // 是否缓存MLS结果
+    pub cache_mls_results: bool,
+    // 投影方法
+    pub projection_method: ProjectionMethod,
+    // 最大线程数
+    pub threads: usize,
+    // 体素大小，仅用于VOXEL_GRID_DILATION上采样方法
+    pub voxel_size: f32,
+    // 体素网格的膨胀迭代次数，仅用于VOXEL_GRID_DILATION上采样方法
+    pub dilation_iteration_num: usize,
+    // 收集输出中每个点对应的输入点索引
+    pub corresponding_input_indices: Vec<usize>,
+    // 随机数生成器
+    pub rng: rand::rngs::ThreadRng,
+    // 随机数生成器使用的均匀分布，仅用于RANDOM_UNIFORM_DENSITY上采样
+    pub rng_uniform_distribution: Option<rand_distr::Uniform<f64>>,
 }
 
 // 3. 定义多项式偏导数结构体
@@ -81,6 +123,30 @@ pub struct MLSProjectionResults {
     pub point: Vector3<f64>,  
     // The projected point's normal.
     pub normal: Vector3<f64>, 
+}
+
+// 5. 定义 MLSVoxelGrid 结构体
+#[derive(Default, Clone)]
+pub struct MLSVoxelGrid<PointT> {
+    // 存储体素网格的映射，键为一维索引，值为 Leaf 结构体
+    pub voxel_grid: BTreeMap<u64, Leaf>,
+    // 体素网格的最小边界
+    pub bounding_min: Vector4<f32>,
+    // 体素网格的最大边界
+    pub bounding_max: Vector4<f32>,
+    // 数据的大小
+    pub data_size: u64,
+    // 体素的大小
+    pub voxel_size: f32,
+    // 点类型
+    _marker: PhantomData<PointT>,
+}
+
+// 6. 定义 Leaf 结构体，表示体素网格中的叶子节点
+#[derive(Default, Clone)]
+pub struct Leaf {
+    // 表示该叶子节点是否有效
+    pub valid: bool,
 }
 
 /* end 结构体 */
@@ -527,6 +593,19 @@ impl<PointInT, PointOutT> MovingLeastSquares<PointInT, PointOutT> {
             order: 2,
             compute_normals: false,
             mls_results: Vec::new(),
+            distinct_cloud: Arc::new(Vec::new()),
+            upsample_method: UpsamplingMethod::NONE,
+            upsampling_radius: 0.0,
+            upsampling_step: 0.0,
+            desired_num_points_in_radius: 0,
+            cache_mls_results: true,
+            projection_method: ProjectionMethod::SIMPLE,
+            threads: 1,
+            voxel_size: 1.0,
+            dilation_iteration_num: 0,
+            corresponding_input_indices: vec![],
+            rng: rand::rng(),
+            rng_uniform_distribution: None,
         }
     }
 
@@ -549,49 +628,465 @@ impl<PointInT, PointOutT> MovingLeastSquares<PointInT, PointOutT> {
     pub fn set_compute_normals(&mut self, compute: bool) {
         self.compute_normals = compute;
     }
+    
+    // 2.6 设置不同的点云，用于DISTINCT_CLOUD上采样方法
+    pub fn set_distinct_cloud(&mut self, cloud: Arc<Vec<PointInT>>) {
+        self.distinct_cloud = cloud;
+    }
+    
+    // 2.7 设置上采样方法
+    pub fn set_upsampling_method(&mut self, method: UpsamplingMethod) {
+        self.upsample_method = method;
+    }
+    
+    // 2.8 设置上采样半径，仅用于SAMPLE_LOCAL_PLANE上采样
+    pub fn set_upsampling_radius(&mut self, radius: f64) {
+        self.upsampling_radius = radius;
+    }
+    
+    // 2.9 设置上采样步长，仅用于SAMPLE_LOCAL_PLANE上采样
+    pub fn set_upsampling_step_size(&mut self, step_size: f64) {
+        self.upsampling_step = step_size;
+    }
+    
+    // 2.10 设置搜索半径内期望的点数，仅用于RANDOM_UNIFORM_DENSITY上采样
+    pub fn set_point_density(&mut self, num_points: usize) {
+        self.desired_num_points_in_radius = num_points;
+    }
+    
+    // 2.11 设置是否缓存MLS结果
+    pub fn set_cache_mls_results(&mut self, cache: bool) {
+        self.cache_mls_results = cache;
+    }
+    
+    // 2.12 设置投影方法
+    pub fn set_projection_method(&mut self, method: ProjectionMethod) {
+        self.projection_method = method;
+    }
+    
+    // 2.13 设置最大线程数
+    pub fn set_number_of_threads(&mut self, threads: usize) {
+        self.threads = threads;
+    }
+    
+    // 2.14 设置体素大小，仅用于VOXEL_GRID_DILATION上采样方法
+    pub fn set_dilation_voxel_size(&mut self, size: f32) {
+        self.voxel_size = size;
+    }
+    
+    // 2.15 设置体素网格的膨胀迭代次数，仅用于VOXEL_GRID_DILATION上采样方法
+    pub fn set_dilation_iterations(&mut self, iterations: usize) {
+        self.dilation_iteration_num = iterations;
+    }
+    
+}
 
-    // // 处理点云
-    // pub fn process(&mut self) {
-    //     // 处理逻辑...
-    //     for index in 0..self.input.len() {
-    //         // 计算邻居
-    //         let nn_indices = self.find_neighbors(index);
-    //         // 计算 MLS 表面
-    //         self.compute_mls_surface(index, &nn_indices);
-    //     }
-    // }
+// 先实现特定类型
+impl MovingLeastSquares<PointXYZRGBNormal, PointXYZRGBNormal> {
+    // 2.16 处理点云的主要方法
+    pub fn process(&mut self) {
+        // 重置或初始化对应输入索引
+        self.corresponding_input_indices.clear();
 
-    // // 查找邻居
-    // fn find_neighbors(&self, index: usize) -> Vec<usize> {
-    //     // 邻居查找逻辑...
-    //     vec![] // 返回邻居索引
-    // }
+        // 初始化法线向量
+        let mut normals = vec![];
+        if self.compute_normals {
+            normals = vec![Normal::default(); self.input.len()];
+        }
 
-    // // 计算 MLS 表面
-    // fn compute_mls_surface(&mut self, index: usize, nn_indices: &[usize]) {
-    //     // 计算 MLS 逻辑...
-    //     // 查询点
-    //     let query_point = self.input[index]; 
-    //     let mls_result_default = MLSResult::default();
-    //     let _ = mls_result_default.query_point = query_point;
-    //     let mls_result = mls_result_default;
-    //     self.mls_results.push(mls_result);
-    // }
+        // 清空输出点云
+        self.output.clear();
 
-    // // 计算法线
-    // fn compute_normals(&self) {
-    //     if self.compute_normals {
-    //         // 法线计算逻辑...
-    //     }
-    // }
+        // 检查搜索半径和高斯参数是否有效
+        if self.search_radius <= 0.0 {
+            eprintln!("[MovingLeastSquares::process] 无效的搜索半径: {}", self.search_radius);
+            return;
+        }
 
-    // // 投影点到 MLS 表面
-    // pub fn project_point(&self, point: &Vector3<f64>) -> Vector3<f64> {
-    //     // 投影逻辑...
-    //     *point // 返回投影后的点
-    // }
+        // 检查DISTINCT_CLOUD上采样方法是否设置了不同的点云
+        if self.upsample_method == UpsamplingMethod::DISTINCT_CLOUD && self.distinct_cloud.is_empty() {
+            eprintln!("[MovingLeastSquares::process] 上采样方法设置为DISTINCT_CLOUD，但未指定不同的点云。");
+            return;
+        }
 
-    // 其他方法...
+        // 初始化随机数生成器
+        if self.upsample_method == UpsamplingMethod::RANDOM_UNIFORM_DENSITY {
+            let tmp = self.search_radius / 2.0;
+            self.rng_uniform_distribution = Some(Uniform::new(-tmp, tmp).expect("REASON"));
+        }
+
+        // 确保在VOXEL_GRID_DILATION或DISTINCT_CLOUD上采样方法下缓存MLS结果
+        if self.upsample_method == UpsamplingMethod::VOXEL_GRID_DILATION || self.upsample_method == UpsamplingMethod::DISTINCT_CLOUD {
+            if !self.cache_mls_results {
+                eprintln!("使用VOXEL_GRID_DILATION或DISTINCT_CLOUD上采样方法时，强制缓存MLS结果。");
+            }
+            self.cache_mls_results = true;
+        }
+
+        // 调整MLS结果向量的大小
+        if self.cache_mls_results {
+            self.mls_results.resize(self.input.len(), MLSResult::default());
+        } else {
+            self.mls_results.resize(1, MLSResult::default());
+        }
+
+        // 执行实际的表面重建
+        self.perform_processing(&mut normals);
+
+        // 如果需要计算法线，将法线信息复制到输出点云
+        if self.compute_normals {
+            for (i, point) in self.output.iter_mut().enumerate() {
+                // self.copy_normal_info(point, &normals[i]);
+                point.normal[0] = normals[i].normal[0];
+                point.normal[1] = normals[i].normal[1];
+                point.normal[2] = normals[i].normal[2];
+            }
+        }
+
+        // 设置输出点云的宽度和高度
+        // self.output.height = 1;
+        // self.output.width = self.output.len();
+    }
+    
+    // 2.17 执行表面重建的具体处理
+    fn perform_processing(&mut self, normals: &mut Vec<Normal>) {
+        // 计算多项式系数的数量
+        let nr_coeff = (self.order + 1) * (self.order + 2) / 2;
+    
+        // 单线程处理每个点
+        for cp in 0..self.input.len() {
+            let nn_indices = self.find_neighbors(cp, self.search_radius);
+            if nn_indices.len() >= 3 {
+                let mut mls_result = MLSResult::default();
+                mls_result.compute_mls_surface(&self.input, cp, &nn_indices, self.search_radius, self.order, None);
+    
+                let mut projected_points = vec![];
+                let mut projected_points_normals = vec![];
+                let mut corresponding_input_indices = vec![];
+    
+                self.compute_mls_point_normal(cp, &nn_indices, &mut projected_points, &mut projected_points_normals, &mut corresponding_input_indices, &mut mls_result);
+    
+                self.output.extend(projected_points);
+                if self.compute_normals {
+                    normals.extend(projected_points_normals);
+                }
+                self.corresponding_input_indices.extend(corresponding_input_indices);
+                if self.cache_mls_results {
+                    self.mls_results[cp] = mls_result;
+                }
+            } else {
+                if self.cache_mls_results {
+                    self.mls_results[cp] = MLSResult::default();
+                }
+            }
+        }
+    
+        // 执行上采样
+        self.perform_upsampling(normals);
+    }
+    
+    // 2.18 执行上采样操作
+    fn perform_upsampling(&mut self, normals: &mut Vec<Normal>) {
+        let input = Arc::clone(&self.input);
+        let distinct_cloud = Arc::clone(&self.distinct_cloud);
+        let mls_results = Arc::new(self.mls_results.clone());
+        let mut output = self.output.clone();
+        let mut corresponding_input_indices = self.corresponding_input_indices.clone();
+    
+        match self.upsample_method {
+            UpsamplingMethod::DISTINCT_CLOUD => {
+                // 修正：明确类型注解
+                <Vec<usize> as std::borrow::BorrowMut<[usize]>>::borrow_mut(&mut self.corresponding_input_indices);
+                for dp_i in 0..distinct_cloud.len() {
+                    let point = &distinct_cloud[dp_i];
+                    if !Self::is_point_finite(point) {
+                        continue;
+                    }
+                    let nn_indices = self.find_neighbors_cloud(point, 1);
+                    if let Some(input_index) = nn_indices.first() {
+                        let curvature = mls_results[*input_index].curvature;
+                        if mls_results[*input_index].valid {
+                            let add_point = Self::point_to_vector3d(*point);
+                            let proj = mls_results[*input_index].project_point(&add_point, self.projection_method, 5 * (self.order + 1) * (self.order + 2) / 2);
+                            self.add_projected_point_normal(
+                                *input_index,
+                                &proj.point,
+                                &proj.normal,
+                                curvature,
+                                // &mut self.output,
+                                &mut output,
+                                normals,
+                                &mut corresponding_input_indices,
+                            );
+                        }
+                    }
+                }
+            }
+            UpsamplingMethod::VOXEL_GRID_DILATION => {
+                // 修正：明确类型注解
+                <Vec<usize> as std::borrow::BorrowMut<[usize]>>::borrow_mut(&mut self.corresponding_input_indices);
+                let mut voxel_grid = MLSVoxelGrid::<PointXYZRGBNormal>::new(&input, &(0..input.len()).collect(), self.voxel_size, self.dilation_iteration_num as i32);
+                for _ in 0..self.dilation_iteration_num {
+                    voxel_grid.dilate();
+                }
+                for (index_1d, _) in voxel_grid.voxel_grid.iter() {
+                    let pos = MLSVoxelGrid::<PointXYZRGBNormal>::get_position(*index_1d, voxel_grid.data_size, &voxel_grid.bounding_min, voxel_grid.voxel_size);
+                    let mut p = PointXYZRGBNormal::default();
+                    p.x = pos[0];
+                    p.y = pos[1];
+                    p.z = pos[2];
+                    let nn_indices = self.find_neighbors_cloud(&p, 1);
+                    if let Some(input_index) = nn_indices.first() {
+                        let curvature = mls_results[*input_index].curvature;
+                        if mls_results[*input_index].valid {
+                            let add_point = Self::point_to_vector3d(p);
+                            let proj = mls_results[*input_index].project_point(&add_point, self.projection_method, 5 * (self.order + 1) * (self.order + 2) / 2);
+                            self.add_projected_point_normal(
+                                *input_index,
+                                &proj.point,
+                                &proj.normal,
+                                curvature,
+                                // &mut self.output,
+                                &mut output,
+                                normals,
+                                &mut corresponding_input_indices,
+                            );
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    
+    // 2.19 查找给定点的邻居
+    fn find_neighbors(&self, index: usize, radius: f64) -> Vec<usize> {
+        let mut neighbors = vec![];
+        let query_point = Self::point_to_vector3d(self.input[index]);
+        for (i, point) in self.input.iter().enumerate() {
+            let dist = (Self::point_to_vector3d(*point) - query_point).norm();
+            if dist <= radius {
+                neighbors.push(i);
+            }
+        }
+        neighbors
+    }
+    
+    // 2.20 在不同点云中查找给定点的邻居
+    fn find_neighbors_cloud(&mut self, point: &PointXYZRGBNormal, k: usize) -> Vec<usize> {
+        let mut neighbors = vec![];
+        let mut distances = vec![];
+        let query_point = Self::point_to_vector3d(*point);
+        for (i, p) in self.input.iter().enumerate() {
+            let dist = (Self::point_to_vector3d(*p) - query_point).norm();
+            distances.push((i, dist));
+        }
+        distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        for i in 0..k.min(distances.len()) {
+            neighbors.push(distances[i].0);
+        }
+        neighbors
+    }
+    
+    // // 2.21 计算MLS点的法线
+    fn compute_mls_point_normal(
+        &mut self,
+        index: usize,
+        nn_indices: &[usize],
+        projected_points: &mut Vec<PointXYZRGBNormal>,
+        projected_points_normals: &mut Vec<Normal>,
+        corresponding_input_indices: &mut Vec<usize>,
+        mls_result: &mut MLSResult,
+    ) {
+        // 计算MLS表面，注意：这里将compute_mls_surface方法添加到了MLSResult结构体中
+        mls_result.compute_mls_surface(
+            &self.input,
+            index,
+            nn_indices,
+            self.search_radius,
+            self.order,
+            None,
+        );
+    
+        match self.upsample_method {
+            // 不进行上采样，仅将输入点投影到它们自己的MLS表面
+            UpsamplingMethod::NONE => {
+                // 使用指定方法投影查询点
+                let proj = mls_result.project_query_point(self.projection_method, (self.order + 1) * (self.order + 2) / 2);
+                // 添加投影点及其法线
+                self.add_projected_point_normal(
+                    index,
+                    &proj.point,
+                    &proj.normal,
+                    mls_result.curvature,
+                    projected_points,
+                    projected_points_normals,
+                    corresponding_input_indices,
+                );
+            }
+            // 每个输入点的局部平面将使用上采样半径和上采样步长参数以圆形方式进行采样
+            UpsamplingMethod::SAMPLE_LOCAL_PLANE => {
+                let mut u_disp = -self.upsampling_radius as f32;
+                while u_disp <= self.upsampling_radius as f32 {
+                    let mut v_disp = -self.upsampling_radius as f32;
+                    while v_disp <= self.upsampling_radius as f32 {
+                        // 检查点是否在圆形采样区域内
+                        if u_disp * u_disp + v_disp * v_disp < (self.upsampling_radius * self.upsampling_radius) as f32 {
+                            // 将点沿MLS平面法线投影到多项式表面
+                            let proj = mls_result.project_point_simple_to_polynomial_surface(u_disp as f64, v_disp as f64);
+                            // 添加投影点及其法线
+                            self.add_projected_point_normal(
+                                index,
+                                &proj.point,
+                                &proj.normal,
+                                mls_result.curvature,
+                                projected_points,
+                                projected_points_normals,
+                                corresponding_input_indices,
+                            );
+                        }
+                        v_disp += self.upsampling_step as f32;
+                    }
+                    u_disp += self.upsampling_step as f32;
+                }
+            }
+            // 每个输入点的局部平面将使用均匀随机分布进行采样，以确保点的密度在整个云中保持恒定
+            UpsamplingMethod::RANDOM_UNIFORM_DENSITY => {
+                // 计算需要添加的点数
+                let num_points_to_add = ((self.desired_num_points_in_radius as f64 / 2.0 / nn_indices.len() as f64).floor()) as usize;
+                if num_points_to_add <= 0 {
+                    // 密度足够，仅添加查询点
+                    let proj = mls_result.project_query_point(self.projection_method, (self.order + 1) * (self.order + 2) / 2);
+                    self.add_projected_point_normal(
+                        index,
+                        &proj.point,
+                        &proj.normal,
+                        mls_result.curvature,
+                        projected_points,
+                        projected_points_normals,
+                        corresponding_input_indices,
+                    );
+                } else {
+                    // 采样局部平面
+                    let mut num_added = 0;
+                    while num_added < num_points_to_add {
+                        // 生成随机偏移量
+                        let u = self.rng.sample(self.rng_uniform_distribution.as_ref().unwrap());
+                        let v = self.rng.sample(self.rng_uniform_distribution.as_ref().unwrap());
+                        // 检查偏移量是否在圆形区域内
+                        if u * u + v * v > self.search_radius * self.search_radius / 4.0 {
+                            continue;
+                        }
+                        let proj = if self.order > 1 && mls_result.num_neighbors >= 5 * (self.order + 1) * (self.order + 2) / 2 {
+                            // 将点沿MLS平面法线投影到多项式表面
+                            mls_result.project_point_simple_to_polynomial_surface(u, v)
+                        } else {
+                            // 将点投影到MLS平面
+                            mls_result.project_point_to_mls_plane(u, v)
+                        };
+                        // 添加投影点及其法线
+                        self.add_projected_point_normal(
+                            index,
+                            &proj.point,
+                            &proj.normal,
+                            mls_result.curvature,
+                            projected_points,
+                            projected_points_normals,
+                            corresponding_input_indices,
+                        );
+                        num_added += 1;
+                    }
+                }
+            }
+            // 其他上采样方法，目前不做处理
+            _ => {}
+        }
+    }
+    
+    // 2.22 添加投影点及其法线
+    pub fn add_projected_point_normal(
+        &self,
+        index: usize,
+        point: &Vector3<f64>,
+        normal: &Vector3<f64>,
+        curvature: f32,
+        projected_points: &mut Vec<PointXYZRGBNormal>,
+        projected_points_normals: &mut Vec<crate::common::Normal>,
+        corresponding_input_indices: &mut Vec<usize>,
+    ) {
+        // TODO: 支持更多类型
+        // 创建一个临时的输出点
+        let mut aux = PointXYZRGBNormal::default();
+        // 将投影点的坐标赋值给临时输出点
+        aux.x = point[0] as f32;
+        aux.y = point[1] as f32;
+        aux.z = point[2] as f32;
+    
+        // 复制输入点的额外信息到临时输出点
+        // self.copy_missing_fields(&self.input[index], &mut aux);
+    
+        // 将临时输出点添加到投影点集合中
+        projected_points.push(aux);
+        // 记录该投影点对应的输入点索引
+        corresponding_input_indices.push(index);
+    
+        // 如果需要计算法线
+        if self.compute_normals {
+            // 创建一个临时的法线对象
+            let mut aux_normal = crate::common::Normal::default();
+            // 将投影点的法线信息赋值给临时法线对象
+            aux_normal.normal[0] = normal[0] as f32;
+            aux_normal.normal[1] = normal[1] as f32;
+            aux_normal.normal[2] = normal[2] as f32;
+            // 将投影点的曲率信息赋值给临时法线对象
+            aux_normal.curvature = curvature;
+            // 将临时法线对象添加到投影点法线集合中
+            projected_points_normals.push(aux_normal);
+        }
+    }
+    
+    // 2.23 获取结构体名称
+    pub fn get_class_name() -> &'static str {
+        "MovingLeastSquares"
+    }
+    
+    // 2.24 Point转Vector3类型
+    pub fn point_to_vector3d(point: PointXYZRGBNormal) -> Vector3<f64> {
+        Vector3::new(point.x as f64, point.y as f64, point.z as f64)
+    }
+    
+    // 2.25 判断点是否是有限点方法
+    fn is_point_finite(point: &PointXYZRGBNormal) -> bool {
+        point.x.is_finite() && point.y.is_finite() && point.z.is_finite()
+    }
+    
+}
+
+// 使用 paste 宏生成重复代码，分别为 PointXYZRGB 和 PointXYZRGBNormal 实现 MovingLeastSquares
+paste! {
+    macro_rules! impl_moving_least_squares {
+        ($PointInT:ty, $PointOutT:ty) => {
+            impl MovingLeastSquares<$PointInT, $PointOutT> {
+                // 复制缺失字段的方法
+                pub fn copy_missing_fields(&self, point_in: &$PointInT, point_out: &mut $PointOutT) {
+                    // 保存输出点的临时副本
+                    let temp = point_out.clone();
+                    // TODO 复制输入点的信息到输出点
+                    // copy_point(point_in, point_out);
+                    // 恢复输出点的 XYZ 坐标
+                    point_out.x = temp.x;
+                    point_out.y = temp.y;
+                    point_out.z = temp.z;
+                }
+            }
+        };
+    }
+
+    // 输入输出类型的排列组合
+    impl_moving_least_squares!(PointXYZRGB, PointXYZRGB);
+    impl_moving_least_squares!(PointXYZRGB, PointXYZRGBNormal);
+    impl_moving_least_squares!(PointXYZRGBNormal, PointXYZRGB);
+    impl_moving_least_squares!(PointXYZRGBNormal, PointXYZRGBNormal);
 }
 
 // 3. PolynomialPartialDerivative的实现
@@ -623,4 +1118,357 @@ impl MLSProjectionResults {
     }
 }
 
+// 5. MLSVoxelGrid的实现
+paste! {
+    // 使用 paste 宏生成重复代码,
+    macro_rules! impl_mlsvoxelgrid {
+        ($PointT:ty) => {
+            impl MLSVoxelGrid<$PointT> {
+                // 5.1 构造函数，用于创建 MLSVoxelGrid 实例
+                pub fn new(cloud: &Arc<Vec<$PointT>>, indices: &Vec<usize>, voxel_size: f32, dilation_iteration_num: i32) -> Self {
+                    let mut voxel_grid = BTreeMap::new();
+                    let mut bounding_min = Vector4::new(f32::MAX, f32::MAX, f32::MAX, 0.0);
+                    let mut bounding_max = Vector4::new(f32::MIN, f32::MIN, f32::MIN, 0.0);
+                    let mut _marker = PhantomData;
+
+                    // 计算点云的最小和最大边界
+                    for &idx in indices.iter() {
+                        let point = &cloud[idx];
+                        for (i, coord) in [point.x, point.y, point.z].iter().enumerate() {
+                            if *coord < bounding_min[i] {
+                                bounding_min[i] = *coord;
+                            }
+                            if *coord > bounding_max[i] {
+                                bounding_max[i] = *coord;
+                            }
+                        }
+                    }
+
+                    // 扩展边界以考虑膨胀操作
+                    bounding_min -= Vector4::new(voxel_size * (dilation_iteration_num + 1) as f32, voxel_size * (dilation_iteration_num + 1) as f32, voxel_size * (dilation_iteration_num + 1) as f32, 0.0);
+                    bounding_max += Vector4::new(voxel_size * (dilation_iteration_num + 1) as f32, voxel_size * (dilation_iteration_num + 1) as f32, voxel_size * (dilation_iteration_num + 1) as f32, 0.0);
+
+                    let bounding_box_size = bounding_max - bounding_min;
+                    let max_size = bounding_box_size.x.max(bounding_box_size.y).max(bounding_box_size.z);
+                    let data_size = (max_size / voxel_size).ceil() as u64;
+
+                    // 将初始点云放入体素网格
+                    for &idx in indices.iter() {
+                        let point = &cloud[idx];
+                        if point.x.is_finite() {
+                            let pos = Self::get_cell_index(&Vector3::new(point.x, point.y, point.z), &bounding_min, voxel_size);
+                            let index_1d = Self::get_index_in_1d(&pos, data_size);
+                            voxel_grid.insert(index_1d, Leaf::new());
+                        }
+                    }
+
+                    MLSVoxelGrid {
+                        voxel_grid,
+                        bounding_min,
+                        bounding_max,
+                        data_size,
+                        voxel_size,
+                        _marker,
+                    }
+                }
+
+                // 5.2 将三维索引转换为一维索引
+                pub fn get_index_in_1d(index: &Vector3<i32>, data_size: u64) -> u64 {
+                    (index[0] as u64) * data_size * data_size + (index[1] as u64) * data_size + (index[2] as u64)
+                }
+
+                // 5.3 将一维索引转换为三维索引
+                pub fn get_index_in_3d(index_1d: u64, data_size: u64) -> Vector3<i32> {
+                    let mut index_1d_mut = index_1d;
+                    let mut index_3d = Vector3::new(0, 0, 0);
+                    index_3d[0] = (index_1d_mut / (data_size * data_size)) as i32;
+                    index_1d_mut -= (index_3d[0] as u64) * data_size * data_size;
+                    index_3d[1] = (index_1d_mut / data_size) as i32;
+                    index_1d_mut -= (index_3d[1] as u64) * data_size;
+                    index_3d[2] = index_1d_mut as i32;
+                    index_3d
+                }
+
+                // 5.4 获取点所在的体素索引
+                pub fn get_cell_index(p: &Vector3<f32>, bounding_min: &Vector4<f32>, voxel_size: f32) -> Vector3<i32> {
+                    let mut index = Vector3::new(0, 0, 0);
+                    for i in 0..3 {
+                        index[i] = ((p[i] - bounding_min[i]) / voxel_size) as i32;
+                    }
+                    index
+                }
+
+                // 5.5 根据一维索引获取点的位置
+                pub fn get_position(index_1d: u64, data_size: u64, bounding_min: &Vector4<f32>, voxel_size: f32) -> Vector3<f32> {
+                    let index_3d = Self::get_index_in_3d(index_1d, data_size);
+                    let mut point = Vector3::new(0.0, 0.0, 0.0);
+                    for i in 0..3 {
+                        point[i] = (index_3d[i] as f32) * voxel_size + bounding_min[i];
+                    }
+                    point
+                }
+
+                // 5.6 膨胀操作
+                pub fn dilate(&mut self) {
+                    let mut new_voxel_grid = self.voxel_grid.clone();
+                    for (index_1d, _) in self.voxel_grid.iter() {
+                        let index = Self::get_index_in_3d(*index_1d, self.data_size);
+                        // 对其所有体素进行膨胀操作
+                        for x in -1..=1 {
+                            for y in -1..=1 {
+                                for z in -1..=1 {
+                                    if x != 0 || y != 0 || z != 0 {
+                                        let new_index = index + Vector3::new(x, y, z);
+                                        let new_index_1d = Self::get_index_in_1d(&new_index, self.data_size);
+                                        new_voxel_grid.insert(new_index_1d, Leaf::new());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // 更新体素网格
+                    self.voxel_grid = new_voxel_grid;
+                }
+            }
+        };
+    }
+
+    // 为 PointXYZRGB 实现 MLSVoxelGrid
+    impl_mlsvoxelgrid!(PointXYZRGB);
+    // 为 PointXYZRGBNormal 实现 MLSVoxelGrid
+    impl_mlsvoxelgrid!(PointXYZRGBNormal);
+}
+
+// 6. 体素网格中的叶子节点Leaf的实现
+impl Leaf {
+    // 6.1 默认构造函数
+    pub fn new() -> Self {
+        Leaf { valid: true }
+    }
+}
+
 /* end 实现 */
+
+/* start 适配Point */
+impl Into<Vector3<f64>> for PointXYZRGBNormal {
+    fn into(self) -> Vector3<f64> {
+        Vector3::new(self.x as f64, self.y as f64, self.z as f64)
+    }
+}
+/* end 适配Point */
+
+#[cfg(test)]
+mod tests1 {
+    use super::*;
+    use nalgebra::Vector3;
+
+    // 测试 MLSResult 的构造函数
+    #[test]
+    fn test_mls_result_new() {
+        let query_point = Vector3::new(1.0, 2.0, 3.0);
+        let mean = Vector3::new(4.0, 5.0, 6.0);
+        let plane_normal = Vector3::new(0.0, 0.0, 1.0);
+        let u = Vector3::new(1.0, 0.0, 0.0);
+        let v = Vector3::new(0.0, 1.0, 0.0);
+        let c_vec = vec![1.0, 2.0, 3.0];
+        let num_neighbors = 10;
+        let curvature = 0.1;
+        let order = 2;
+
+        let result = MLSResult::new(
+            query_point,
+            mean,
+            plane_normal,
+            u,
+            v,
+            c_vec.clone(),
+            num_neighbors,
+            curvature,
+            order,
+        );
+
+        // 验证构造函数返回的实例的各个字段是否正确
+        assert_eq!(result.query_point, query_point);
+        assert_eq!(result.mean, mean);
+        assert_eq!(result.plane_normal, plane_normal);
+        assert_eq!(result.u_axis, u);
+        assert_eq!(result.v_axis, v);
+        assert_eq!(result.c_vec, c_vec);
+        assert_eq!(result.num_neighbors, num_neighbors);
+        assert_eq!(result.curvature, curvature);
+        assert_eq!(result.order, order);
+        assert!(result.valid);
+    }
+
+    // 测试 get_mls_coordinates 方法
+    #[test]
+    fn test_get_mls_coordinates() {
+        let query_point = Vector3::new(0.0, 0.0, 0.0);
+        let mean = Vector3::new(0.0, 0.0, 0.0);
+        let plane_normal = Vector3::new(0.0, 0.0, 1.0);
+        let u = Vector3::new(1.0, 0.0, 0.0);
+        let v = Vector3::new(0.0, 1.0, 0.0);
+        let c_vec = vec![1.0];
+        let num_neighbors = 1;
+        let curvature = 0.0;
+        let order = 1;
+
+        let result = MLSResult::new(
+            query_point,
+            mean,
+            plane_normal,
+            u,
+            v,
+            c_vec,
+            num_neighbors,
+            curvature,
+            order,
+        );
+
+        let pt = Vector3::new(1.0, 2.0, 3.0);
+        let (u_coord, v_coord, w_coord) = result.get_mls_coordinates(&pt);
+
+        // 验证计算得到的 u, v, w 坐标是否正确
+        assert_eq!(u_coord, pt.dot(&u));
+        assert_eq!(v_coord, pt.dot(&v));
+        assert_eq!(w_coord, pt.dot(&plane_normal));
+    }
+
+    // 测试 get_polynomial_value 方法
+    #[test]
+    fn test_get_polynomial_value() {
+        let query_point = Vector3::new(0.0, 0.0, 0.0);
+        let mean = Vector3::new(0.0, 0.0, 0.0);
+        let plane_normal = Vector3::new(0.0, 0.0, 1.0);
+        let u = Vector3::new(1.0, 0.0, 0.0);
+        let v = Vector3::new(0.0, 1.0, 0.0);
+        let c_vec = vec![1.0];
+        let num_neighbors = 1;
+        let curvature = 0.0;
+        let order = 1;
+
+        let result = MLSResult::new(
+            query_point,
+            mean,
+            plane_normal,
+            u,
+            v,
+            c_vec,
+            num_neighbors,
+            curvature,
+            order,
+        );
+
+        let u = 1.0;
+        let v = 2.0;
+        let value = result.get_polynomial_value(u, v);
+
+        // 验证计算得到的多项式值是否正确
+        assert_eq!(value, 1.0);
+    }
+
+    // 测试 get_polynomial_partial_derivative 方法
+    #[test]
+    fn test_get_polynomial_partial_derivative() {
+        let query_point = Vector3::new(0.0, 0.0, 0.0);
+        let mean = Vector3::new(0.0, 0.0, 0.0);
+        let plane_normal = Vector3::new(0.0, 0.0, 1.0);
+        let u = Vector3::new(1.0, 0.0, 0.0);
+        let v = Vector3::new(0.0, 1.0, 0.0);
+        let c_vec = vec![1.0];
+        let num_neighbors = 1;
+        let curvature = 0.0;
+        let order = 1;
+
+        let result = MLSResult::new(
+            query_point,
+            mean,
+            plane_normal,
+            u,
+            v,
+            c_vec,
+            num_neighbors,
+            curvature,
+            order,
+        );
+
+        let u = 1.0;
+        let v = 2.0;
+        let d = result.get_polynomial_partial_derivative(u, v);
+
+        // 验证计算得到的多项式偏导数是否正确
+        assert_eq!(d.z, 1.0);
+        assert_eq!(d.z_u, 0.0);
+        assert_eq!(d.z_v, 0.0);
+        assert_eq!(d.z_uu, 0.0);
+        assert_eq!(d.z_vv, 0.0);
+        assert_eq!(d.z_uv, 0.0);
+    }
+
+    // 测试 calculate_principal_curvatures 方法
+    #[test]
+    fn test_calculate_principal_curvatures() {
+        let query_point = Vector3::new(0.0, 0.0, 0.0);
+        let mean = Vector3::new(0.0, 0.0, 0.0);
+        let plane_normal = Vector3::new(0.0, 0.0, 1.0);
+        let u = Vector3::new(1.0, 0.0, 0.0);
+        let v = Vector3::new(0.0, 1.0, 0.0);
+        let c_vec = vec![1.0];
+        let num_neighbors = 1;
+        let curvature = 0.0;
+        let order = 1;
+
+        let result = MLSResult::new(
+            query_point,
+            mean,
+            plane_normal,
+            u,
+            v,
+            c_vec,
+            num_neighbors,
+            curvature,
+            order,
+        );
+
+        let u = 1.0;
+        let v = 2.0;
+        let k = result.calculate_principal_curvatures(u, v);
+
+        // 验证计算得到的主曲率是否正确
+        assert_eq!(k[0], 1e-5 as f32);
+        assert_eq!(k[1], 1e-5 as f32);
+    }
+
+    // 测试 compute_mls_weight 方法
+    #[test]
+    fn test_compute_mls_weight() {
+        let query_point = Vector3::new(0.0, 0.0, 0.0);
+        let mean = Vector3::new(0.0, 0.0, 0.0);
+        let plane_normal = Vector3::new(0.0, 0.0, 1.0);
+        let u = Vector3::new(1.0, 0.0, 0.0);
+        let v = Vector3::new(0.0, 1.0, 0.0);
+        let c_vec = vec![1.0];
+        let num_neighbors = 1;
+        let curvature = 0.0;
+        let order = 1;
+
+        let result = MLSResult::new(
+            query_point,
+            mean,
+            plane_normal,
+            u,
+            v,
+            c_vec,
+            num_neighbors,
+            curvature,
+            order,
+        );
+
+        let sq_dist = 1.0;
+        let sq_mls_radius = 2.0;
+        let weight = result.compute_mls_weight(sq_dist, sq_mls_radius);
+
+        // 验证计算得到的 MLS 权重是否正确
+        assert_eq!(weight, std::f64::consts::E.powf(-sq_dist / sq_mls_radius));
+    }
+}

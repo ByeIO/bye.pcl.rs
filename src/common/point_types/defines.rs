@@ -314,7 +314,7 @@ impl std::fmt::Display for InterestPoint {
 }
 
 // 17. 成员: float normal[3], curvature
-#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize, Default)]
 pub struct Normal {
     pub normal: [f32; 3],
     pub curvature: f32,
@@ -367,7 +367,7 @@ impl std::fmt::Display for PointNormal {
 }
 
 // 20. 成员: float x, y, z, rgb, normal[3], curvature
-#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PcdDeserialize, PcdSerialize, Default, Copy)]
 pub struct PointXYZRGBNormal {
     pub x: f32,
     pub y: f32,

@@ -8,6 +8,9 @@
 extern crate quote;
 extern crate syn;
 
+// 线性代数
+use nalgebra::{Const, DimName, storage::Storage};
+
 /// 不能使用path方式引入,否则会找不到impl实现
 // #[path = "./defines.rs"]
 // mod defines;
