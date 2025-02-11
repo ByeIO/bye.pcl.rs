@@ -18,9 +18,8 @@ use syn::{parse_macro_input, DeriveInput};
 use nalgebra::{DMatrix, DVector, Point3, Quaternion, Vector4};
 
 // 导入内部库
-#[path = "./pcl_header.rs"]
-mod pcl_header;
-use pcl_header::PclHeader;
+// #[path = "./pcl_header.rs"]
+use super::pcl_header::PclHeader;
 
 // 1. 属性映射结构体
 struct FieldMapping {

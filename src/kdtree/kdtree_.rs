@@ -32,6 +32,7 @@ use crate::common::{
 };
 
 /// KdTree 表示 kd-tree 实现的基础空间定位器类
+#[derive(Default, Debug, Clone)]
 pub struct KdTreeRust<PointT: KdPoint> {
     // 输入点云数据集
     input: Arc<Vec<PointT>>, 
@@ -320,8 +321,6 @@ mod tests10 {
 }
 
 // 20. 类型: PointXYZRGBNormal
-
-
 #[cfg(test)]
 mod tests20 {
     use super::*;
