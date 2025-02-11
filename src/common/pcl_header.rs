@@ -2,7 +2,7 @@ use std::fmt;
 use std::sync::Arc;
 
 /// PCLHeader 结构体，用于存储点云数据的头部信息
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct PclHeader {
     /// 序列号
     pub seq: u32,

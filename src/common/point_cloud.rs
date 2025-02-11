@@ -22,6 +22,7 @@ use nalgebra::{DMatrix, DVector, Point3, Quaternion, Vector4};
 use super::pcl_header::PclHeader;
 
 // 1. 属性映射结构体
+#[derive(Default)]
 struct FieldMapping {
     serialized_offset: usize,
     struct_offset: usize,
@@ -65,7 +66,7 @@ impl<PointInT> NdCopyPointEigenFunctor<PointInT> {
 }
 
 // 4. 点云结构体
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct PointCloud<PointType> {
     // 点云头信息，包含采集时间等信息
     pub header: PclHeader,
