@@ -1,6 +1,8 @@
 # 🌟bye_pcl_rs点云库🌟/Point Cloud Library
 
 **点云库仍然在开发中, 功能实现不完全/Unimplemented!!!**
+**提示: 由于功能实现不完全，因而临时导入了f3l库**
+**Notice: use f3l crate**
 
 ## 📝简介/Description
 点云库专门用于2D/3D图像和点云处理。🚀 使用纯Rust ⚙️ 进行编写。

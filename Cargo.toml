@@ -1,6 +1,6 @@
 [package]
 name = "bye_pcl_rs"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 # 可免费商用
 license-file = "./LICENSE"
@@ -34,6 +34,7 @@ rand = { version = "0.9.0" }
 rand_distr = "0.5.0"
 # 序列化
 serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.138"
 # 多线程
 tokio = "1.43.0"
 # 命令行参数解析
@@ -67,6 +68,14 @@ typenum = "1.17.0"
 poisson_reconstruction = { version = "0.3.1", features = ["serde", "serde-serialize"] }
 # NURBS曲线/表面建模库
 curvo = { version = "0.1.49", features = ["serde"] }
+# f3l系列算法包
+f3l_filter = { version = "0.2.0", features = ["app_kiss3d"] }
+f3l_core = { version = "0.3.0" }
+f3l_surface = "0.2.0"
+f3l_features = { version = "0.2.2", features = ["app_kiss3d"] }
+f3l_glam = "0.1.1"
+f3l_search_tree = { version = "0.3.1", features = ["app_kiss3d"] }
+f3l_segmentation = { version = "0.2.1", features = ["app_kiss3d"] }
 
 [dev-dependencies]
 # 性能评测
